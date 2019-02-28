@@ -50,7 +50,7 @@ else
 fi
 
 #Create DB Moodle
-RESULT=`mysqlshow --user=moodleUser --password=moodlePassword moodle| grep -v Wildcard | grep -o moodle`
+RESULT=`mysqlshow --user=${USERDB} --password=${PASSWDDB} ${MAINDB}| grep -v Wildcard | grep -o ${MAINDB}`
 if [ "$RESULT" == "moodle" ]; then
     echo "User moodle database is already created."
 else
