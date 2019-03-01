@@ -32,7 +32,7 @@ is_mysql_root_password_set() {
 # Predicate that returns exit status 0 if the mysql(1) command is available,
 # nonzero exit status otherwise.
 is_mysql_command_available() {
-  which mysql > /dev/null 2>&1
+  sudo which mysql > /dev/null 2>&1
 }
 
 #}}}
@@ -46,7 +46,7 @@ fi
 
 #}}}
 #{{{ Variables
-db_root_password="${1}"
+DB_ROOT_PASSWD="${1}"
 #}}}
 
 # Script proper
@@ -62,7 +62,7 @@ if is_mysql_root_password_set; then
 fi
 
 mysql --user=root <<_EOF_
-  UPDATE mysql.user SET Password=PASSWORD('${db_root_password}') WHERE User='root';
+  UPDATE mysql.user SET Password=PASSWORD('${DB_ROOT_PASSWD}') WHERE User='root';
   DELETE FROM mysql.user WHERE User='';
   DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
   DROP DATABASE IF EXISTS test;
