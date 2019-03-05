@@ -2,7 +2,7 @@
 # vi: set ft=ruby :
 
 BOX_IMAGE = "centos/7"
-NODE_COUNT = 1
+NODE_COUNT = 2
 
 # DataBase credentials
 DB_ROOTPASSWD = "R00t-P@Ssw0rd"
