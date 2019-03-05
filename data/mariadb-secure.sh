@@ -61,11 +61,9 @@ if is_mysql_root_password_set; then
   exit 0
 fi
 
-mysql --user=root <<_EOF_
-  UPDATE mysql.user SET Password=PASSWORD('${DB_ROOT_PASSWD}') WHERE User='root';
-  DELETE FROM mysql.user WHERE User='';
-  DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
-  DROP DATABASE IF EXISTS test;
-  DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
-  FLUSH PRIVILEGES;
-_EOF_
+sudo mysql -uroot -e "UPDATE mysql.user SET Password=PASSWORD('${DB_ROOT_PASSWD}') WHERE User='root';"
+sudo mysql -uroot -e "DELETE FROM mysql.user WHERE User='';"
+sudo mysql -uroot -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');"
+sudo mysql -uroot -e "DROP DATABASE IF EXISTS test;"
+sudo mysql -uroot -e "DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';"
+sudo mysql -uroot -e "FLUSH PRIVILEGES;"

@@ -1,10 +1,12 @@
 #!/bin/bash
 
 # Define Vars
-DBROOTPASS="P@$$w0rd"
-MAINDB="moodle"
-USERDB="moodleUS"
-PASSWDDB="moodlePAS"
+SRVHOSTIP=${1}
+DBNAME=${2}
+DBUSER=${3}
+DBPASSWD=${4}
+DBHOSTIP=${5}
+
 
 # Update system
 sudo yum -y update
@@ -27,6 +29,8 @@ else
 
     sudo systemctl start httpd
     sudo systemctl enable httpd
+
+    sudo setsebool -P httpd_can_network_connect=1
 fi
 
 # Install PHP 7.0
@@ -46,16 +50,18 @@ sudo tar -xzf moodle-latest-36.tgz -C /var/www/html/
 # Install App
 sudo php /var/www/html/moodle/admin/cli/install.php --chmod=2770 \
  --lang=uk \
- --dbtype=mariadb \
- --wwwroot=http://192.168.56.100/moodle \
+ --wwwroot=http://${SRVHOSTIP}/moodle \
  --dataroot=/var/moodledata \
- --dbname=$MAINDB \
- --dbuser=$USERDB \
- --dbpass=$PASSWDDB \
+ --dbtype=mariadb \
+ --dbhost=${DBHOSTIP} \
+ --dbname=${DBNAME} \
+ --dbuser=${DBUSER} \
+ --dbpass=${DBPASSWD} \
  --dbport=3306 \
  --fullname=Moodle \
  --shortname=moodle \
  --summary=Moodle \
+ --adminuser=sysadmin \
  --adminpass=Admin1 \
  --non-interactive \
  --agree-license
