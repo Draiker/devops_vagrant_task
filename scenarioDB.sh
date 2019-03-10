@@ -1,44 +1,53 @@
 #!/bin/bash
 
 # Define Vars
-DBROOTPASSWD=${1}
-DBNAME=${2}
-DBUSER=${3}
-DBPASSWD=${4}
+DBNAME=${1}
+DBUSER=${2}
+DBPASSWD=${3}
+NODECOUNT=${4}
 NETWORK=${5}
+STARTIPNUM=${6}
+COUNTER=(1)
 
 # Update system
-sudo yum -y update
+#sudo yum -y update
 
 # Install EPEL package
-sudo yum -y install epel-release
-sudo yum -y install yum-utils
+sudo yum -y install epel-release yum-utils
 
-# Install MariaDB
-if command -v mysql 2>/dev/null; then
-    echo "Mariadb is already installed."
+# Install PostgresSQL
+if command -V postgres 2>/dev/null; then
+    echo "PostresSQL is already installed."
 else
-    sudo cp /vagrant/data/MariaDB-10.3.repo /etc/yum.repos.d/MariaDB.repo
+    sudo yum -y install https://download.postgresql.org/pub/repos/yum/11/redhat/rhel-7-x86_64/pgdg-centos11-11-2.noarch.rpm
+    sudo yum -y install postgresql11 postgresql11-server
+    sudo /usr/pgsql-11/bin/postgresql-11-setup initdb
 
-    sudo yum -y install MariaDB-server mariadb
-    sudo systemctl start mariadb
-    sudo systemctl enable mariadb
+    sudo systemctl start postgresql-11
+    sudo systemctl enable postgresql-11
 
     # Secure config MariaDB
-    sudo sed -i -e 's/#bind-address=0.0.0.0/bind-address=0.0.0.0/g' /etc/my.cnf.d/server.cnf
-    sudo sed -i -e '/\[mysqld\]/a innodb_file_per_table = 1' /etc/my.cnf.d/server.cnf
-    sudo sed -i -e '/\[mysqld\]/a innodb_large_prefix = 1' /etc/my.cnf.d/server.cnf
-    sudo chmod -v u+x /vagrant/data/mariadb-secure.sh
-    sudo bash /vagrant/data/mariadb-secure.sh "${DBROOTPASSWD}"
+    sudo sed -i -e "s/#listen_addresses = 'localhost'/listen_addresses = '*'/g" /var/lib/pgsql/11/data/postgresql.conf
+    sudo sed -i -e "s/#port = 5432/port = 5432/g" /var/lib/pgsql/11/data/postgresql.conf
+    for ((COUNTER=0; COUNTER<NODECOUNT; COUNTER+=1))
+    do
+        LASTOCT=$((STARTIPNUM+COUNTER))
+        IPWEBHOST="${NETWORK}${LASTOCT}"
+        cat <<EOF | sudo tee -a /var/lib/pgsql/11/data/pg_hba.conf
+host    ${DBNAME}    ${DBUSER}    ${IPWEBHOST}/32    password
+EOF
+    done
+    
+    cat <<EOF | sudo tee -a /var/lib/pgsql/11/data/pg_hba.conf
+host    all    all    0.0.0.0/0    reject
+EOF
+    
+    sudo -u postgres psql -c "CREATE USER ${DBUSER} WITH ENCRYPTED PASSWORD '${DBPASSWD}';"
+    sudo -u postgres psql -c "CREATE DATABASE ${DBNAME} WITH OWNER ${DBUSER};"
+    sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE ${DBNAME} to ${DBUSER};"
 
-    sudo mysql -uroot -p${DBROOTPASSWD} -e "SET GLOBAL character_set_server = 'utf8mb4';"
-
-    sudo mysql -uroot -p${DBROOTPASSWD} -e "CREATE DATABASE ${DBNAME};"
-    sudo mysql -uroot -p${DBROOTPASSWD} -e "CREATE USER '${DBUSER}'@'localhost' IDENTIFIED BY '${DBPASSWD}';"
-    sudo mysql -uroot -p${DBROOTPASSWD} -e "CREATE USER '${DBUSER}'@'${NETWORK}%' IDENTIFIED BY '${DBPASSWD}';"
-    sudo mysql -uroot -p${DBROOTPASSWD} -e "GRANT ALL PRIVILEGES ON ${DBNAME}.* TO '${DBUSER}'@'localhost';"
-    sudo mysql -uroot -p${DBROOTPASSWD} -e "GRANT ALL PRIVILEGES ON ${DBNAME}.* TO '${DBUSER}'@'${NETWORK}%';"
-    sudo mysql -uroot -p${DBROOTPASSWD} -e "FLUSH PRIVILEGES;"
+    sudo systemctl restart postgresql-11
+    
 fi
 
 sudo systemctl restart mariadb

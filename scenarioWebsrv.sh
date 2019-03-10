@@ -9,7 +9,7 @@ DBHOSTIP=${5}
 
 
 # Update system
-sudo yum -y update
+#sudo yum -y update
 
 # Install EPEL package
 sudo yum -y install epel-release
