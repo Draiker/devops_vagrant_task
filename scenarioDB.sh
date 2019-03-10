@@ -7,7 +7,6 @@ DBPASSWD=${3}
 NODECOUNT=${4}
 NETWORK=${5}
 STARTIPNUM=${6}
-COUNTER=(1)
 
 # Update system
 #sudo yum -y update
@@ -56,5 +55,5 @@ sudo systemctl restart mariadb
 sudo systemctl enable firewalld
 sudo systemctl start firewalld
 sudo firewall-cmd --zone=public --add-service=ssh
-sudo firewall-cmd --permanent --zone=public --add-port=3306/tcp 
+sudo firewall-cmd --permanent --zone=public --add-port=5432/tcp 
 sudo firewall-cmd --reload

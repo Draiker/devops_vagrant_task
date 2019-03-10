@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define Vars
-SRVHOSTIP=${1}
+PROXYHOSTIP=${1}
 DBNAME=${2}
 DBUSER=${3}
 DBPASSWD=${4}
@@ -40,7 +40,7 @@ else
     sudo yum -y install http://rpms.remirepo.net/enterprise/remi-release-7.rpm
     sudo yum-config-manager --disable remi-php54
     sudo yum-config-manager --enable remi-php73
-    sudo yum -y install php php-mcrypt php-cli php-gd php-curl php-ldap php-zip php-fileinfo php-xml php-intl php-mbstring php-xmlrpc php-soap php-fpm php-mysqlnd php-devel php-pear php-bcmath php-json
+    sudo yum -y install php php-mcrypt php-cli php-gd php-curl php-ldap php-zip php-fileinfo php-xml php-intl php-mbstring php-xmlrpc php-soap php-fpm php-devel php-pear php-bcmath php-json php-pdo php-pgsql
 fi
 
 # Download&Unpack Moodle
@@ -50,14 +50,14 @@ sudo tar -xzf moodle-latest-36.tgz -C /var/www/html/
 # Install App
 sudo php /var/www/html/moodle/admin/cli/install.php --chmod=2770 \
  --lang=uk \
- --wwwroot=http://${SRVHOSTIP}/moodle \
+ --wwwroot=http://${PROXYHOSTIP}/moodle \
  --dataroot=/var/moodledata \
- --dbtype=mariadb \
+ --dbtype=pgsql \
  --dbhost=${DBHOSTIP} \
  --dbname=${DBNAME} \
  --dbuser=${DBUSER} \
  --dbpass=${DBPASSWD} \
- --dbport=3306 \
+ --dbport=5432 \
  --fullname=Moodle \
  --shortname=moodle \
  --summary=Moodle \
