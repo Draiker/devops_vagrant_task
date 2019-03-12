@@ -1,0 +1,71 @@
+---
+- name: Install Redis
+  hosts: srvDB
+  become: true
+  
+  tasks:
+    - name: Install epel release
+      yum:
+        name: epel-release
+        state: present
+
+    - name: Init Postgres config
+      command: yum update
+
+    - name: Install redis
+      yum:
+        name: redis
+        state: present
+      
+    - name: Start redis, if not started
+      service:
+        name: redis       
+        state: started
+        enabled: yes
+
+    - name: Replace redis config
+      replace:
+        path: /etc/redis.conf
+        regexp: 'bind 127.0.0.1'
+        replace: 'bind 127.0.0.1 {{ DB_HOST_IP }}'
+      notify:
+        - restart redis
+
+    - name: Replace redis config
+      replace:
+        path: /etc/redis.conf
+        regexp: '# requirepass foobared'
+        replace: 'requirepass {{ DBPASSWD }}'
+      notify:
+        - restart redis
+
+    - name: Start service firewalld, if not started
+      service:
+        name: firewalld       
+        state: started
+        enabled: yes    
+
+    - name: Add ssh service firewalld
+      firewalld:
+        zone: public
+        service: ssh
+        permanent: yes
+        state: enabled
+      notify:
+        - firewalld reload
+
+    - name: Add redis service firewalld
+      firewalld:
+        zone: public
+        port: 6379/tcp
+        permanent: yes
+        state: enabled
+      notify:
+        - firewalld reload
+       
+  handlers:
+   - name: restart redis
+     service: name=redis state=restarted
+
+   - name: firewalld reload
+     command: firewall-cmd --reload

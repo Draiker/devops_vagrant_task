@@ -2,17 +2,12 @@
 # vi: set ft=ruby :
 
 BOX_IMAGE = "centos/7"
-NODE_COUNT = 2
-START_IP_NUM = 21
 NETWORK = "192.168.56."
-DB_HOST_IP = "#{NETWORK}11"
-LB_HOST_IP = "192.168.56.10"
-
-# DataBase credentials
-DB_ROOTPASSWD = "R00t-P@Ssw0rd"
-DB_NAME = "moodle_main"
-DB_USER = "moodle_web"
-DB_PASSWD = "M00dle-P@Ssw0rd"
+LB_HOST_IP = "#{NETWORK}10" # 192.168.56.10
+DB_HOST_IP = "#{NETWORK}11" # 192.168.56.11
+ANS_HOST_IP = "#{NETWORK}254" # 192.168.56.254
+START_IP_NUM = 21 # 192.168.56.21-253
+NODE_COUNT = 2
 
 Vagrant.configure("2") do |config|
 
@@ -20,27 +15,41 @@ Vagrant.configure("2") do |config|
     vb.memory = "512"
   end
 
-  config.vm.define "serverDB" do |subconfigdb|
+  # Run all VMs
+  config.vm.define "srvDB" do |subconfigdb|
     subconfigdb.vm.box = BOX_IMAGE
-    subconfigdb.vm.hostname = "serverDB"
-    subconfigdb.vm.network :private_network, ip: DB_HOST_IP
-    subconfigdb.vm.provision "shell", path: "scenarioDB.sh", :args => [DB_NAME, DB_USER, DB_PASSWD, NODE_COUNT, NETWORK, START_IP_NUM]
+    subconfigdb.vm.hostname = "srvDB"
+    subconfigdb.vm.network :private_network, ip: "#{DB_HOST_IP}"
   end
+  
   (1..NODE_COUNT).each do |i|
-    config.vm.define "serverWeb#{i}" do |subconfigweb|
+    config.vm.define "srvWeb#{i}" do |subconfigweb|
       SRV_HOST_IP = "#{NETWORK}#{START_IP_NUM + i - 1}"
       subconfigweb.vm.box = BOX_IMAGE
-      subconfigweb.vm.hostname = "serverWeb#{i}"
+      subconfigweb.vm.hostname = "srvWeb#{i}"
       subconfigweb.vm.network :private_network, ip: "#{SRV_HOST_IP}"
-      subconfigweb.vm.provision "shell", path: "scenarioWebsrv.sh", :args => [LB_HOST_IP, DB_NAME, DB_USER, DB_PASSWD, DB_HOST_IP]
     end
   end
-  config.vm.define "serverLB" do |subconfiglb|
+  
+  config.vm.define "srvLB" do |subconfiglb|
     subconfiglb.vm.box = BOX_IMAGE
-    subconfiglb.vm.box = BOX_IMAGE
-    subconfiglb.vm.hostname = "serverLB"
-    subconfiglb.vm.network :private_network, ip: LB_HOST_IP
-    subconfiglb.vm.provision "shell", path: "scenarioLB.sh", :args => [NODE_COUNT, NETWORK, START_IP_NUM, LB_HOST_IP]
+    subconfiglb.vm.hostname = "srvLB"
+    subconfiglb.vm.network :private_network, ip: "#{LB_HOST_IP}"
   end
 
+  config.vm.define "srvANS" do |subconfigans|
+    subconfigans.vm.box = BOX_IMAGE
+    subconfigans.vm.hostname = "srvANS"
+    subconfigans.vm.network :private_network, ip: "#{ANS_HOST_IP}"
+    subconfigans.vm.provision "shell", path: "ansibleInit.sh", :args => [DB_HOST_IP, LB_HOST_IP]
+    subconfigans.vm.provision "file", source: ".vagrant/machines/srvDB/virtualbox/private_key", destination: "~/.ssh/#{DB_HOST_IP}.pem"
+    subconfigans.vm.provision "file", source: ".vagrant/machines/srvLB/virtualbox/private_key", destination: "~/.ssh/#{LB_HOST_IP}.pem"
+    (1..NODE_COUNT).each do |n|
+      SRV_HOST_IP = "#{NETWORK}#{START_IP_NUM + n - 1}"
+      SRV_HOST_NAME = "srvWeb#{n}"
+      subconfigans.vm.provision "file", source: ".vagrant/machines/#{SRV_HOST_NAME}/virtualbox/private_key", destination: "~/.ssh/#{SRV_HOST_IP}.pem"
+      subconfigans.vm.provision "shell", path: "ansibleConfigWebSrv.sh", :args => [SRV_HOST_IP, SRV_HOST_NAME, LB_HOST_IP]
+    end
+    #subconfigans.vm.provision "shell", path: "ansibleRun.sh"
+  end
 end

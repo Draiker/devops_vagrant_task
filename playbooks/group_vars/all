@@ -1,0 +1,10 @@
+NETWORK     : "192.168.56."
+LB_HOST_IP  : "192.168.56.10"
+DB_HOST_IP  : "192.168.56.11"
+ANS_HOST_IP : "192.168.56.254"
+START_IP_NUM: 21
+NODE_COUNT  : 2
+
+DBNAME      : moodle_main
+DBUSER      : moodle_web
+DBPASSWD    : M00dle-P@Ssw0rd

@@ -1,0 +1,184 @@
+---
+- name: web server install
+  hosts: srvWEB
+  become: true
+  gather_facts: true
+
+  tasks:
+
+    - name: Install apache
+      yum:
+        name:
+          - epel-release
+          - yum-plugin-fastestmirror
+          - httpd
+          - policycoreutils-python
+        state: latest
+
+    - name: Remove the pre-set Apache welcome page
+      replace:
+        path: /etc/httpd/conf/httpd.conf
+        regexp: "Options Indexes FollowSymLinks"
+        replace: "Options FollowSymLinks"
+      notify:
+        - restart httpd
+
+    - name: Replace apache config
+      replace:
+        path: /etc/httpd/conf/httpd.conf
+        regexp: 'DirectoryIndex index.html'
+        replace: 'DirectoryIndex index.php index.html index.htm'
+      notify:
+        - restart httpd
+
+    - name: Set httpd_can_network_connect flag on 
+      seboolean:
+        name: httpd_can_network_connect
+        state: yes
+        persistent: yes
+
+    - name: Start service httpd, if not started
+      service:
+        name: httpd       
+        state: started
+        enabled: yes
+
+    - name: Install remi
+      yum:
+        name: http://rpms.remirepo.net/enterprise/remi-release-7.rpm
+        state: present
+
+    - name: disable remi-php54
+      shell: yum-config-manager --disable remi-php54
+
+    - name: enable remi-php73
+      shell: yum-config-manager --enable remi-php73
+
+    - name: Install php
+      yum: pkg={{ item.name }} state=latest
+      with_items:
+        - name: php
+        - name: php-common
+        - name: php-pgsql
+        - name: php-pear
+        - name: php-mcrypt
+        - name: php-cli
+        - name: php-gd
+        - name: php-curl
+        - name: php-mbstring
+        - name: php-xmlrpc
+        - name: php-soap
+        - name: php-ldap 
+        - name: php-zip 
+        - name: php-fileinfo 
+        - name: php-xml 
+        - name: php-intl
+        - name: php-redis
+        - name: php-fpm
+        - name: php-devel
+        - name: php-bcmath
+        - name: php-json
+        - name: php-pdo
+ 
+    - name: Replace php config
+      replace:
+        path: /etc/php.ini
+        regexp: 'session.save_handler = files'
+        replace: 'session.save_handler = redis'
+  
+    - name: Replace php config
+      replace:
+        path: /etc/php.ini
+        regexp: ';session.save_path = \"/tmp\"'
+        replace: 'session.save_path = "tcp://{{ DB_HOST_IP }}:6379?auth={{ DBPASSWD }}"'
+
+    - name: Extract moodle-latest-36.tgz into /var/www/html
+      unarchive:
+        src: https://download.moodle.org/download.php/direct/stable36/moodle-latest-36.tgz
+        dest: /var/www/html
+        owner: apache
+        group: apache
+        remote_src: yes
+
+    - name: Replace Document Root apache config
+      replace:
+        path: /etc/httpd/conf/httpd.conf
+        regexp: 'DocumentRoot "/var/www/html"'
+        replace: 'DocumentRoot "/var/www/html/moodle"'
+      notify:
+        - restart httpd
+
+    - name: Creates directory /var/moodledata
+      file:
+        path: /var/moodledata
+        state: directory
+        owner: apache
+        group: apache
+
+    - name: Install Moodle
+      command: php admin/cli/install.php
+        --lang=uk \
+        --wwwroot=http://{{ LB_HOST_IP }}/moodle \
+        --dataroot=/var/moodledata \
+        --dbtype=pgsql \
+        --dbhost={{ DB_HOST_IP }} \
+        --dbname={{ DBNAME }} \
+        --dbuser={{ DBUSER }} \
+        --dbpass={{ DBPASSWD }} \
+        --dbport=5432 \
+        --fullname=Moodle \
+        --shortname=moodle \
+        --summary=Moodle \
+        --adminuser=sysadmin \
+        --adminpass=Admin1 \
+        --adminemail='example@example.com'
+        --non-interactive \
+        --agree-license
+        --allow-unstable
+      args:
+        chdir: "/var/www/html/moodle/"
+        creates: config.php
+      ignore_errors: yes
+      notify:
+        - restart httpd
+
+    - name: Allow apache to modify files in /var/moodledata
+      sefcontext:
+        target: '/var/moodledata'
+        setype: httpd_sys_rw_content_t
+        reload: True
+        state: present
+
+    - name: Allow apache to modify files in /var/moodledata
+      shell: chcon -R -t httpd_sys_rw_content_t /var/moodledata
+
+    - name: Start service firewalld, if not started
+      service:
+        name: firewalld       
+        state: started
+        enabled: yes    
+
+    - name: Add ssh service firewalld
+      firewalld:
+        zone: public
+        service: ssh
+        permanent: yes
+        state: enabled
+      notify:
+        - firewalld reload
+
+    - name: Add http service firewalld
+      firewalld:
+        zone: public
+        port: 80/tcp
+        permanent: yes
+        state: enabled
+      notify:
+        - firewalld reload
+       
+  handlers:
+    - name: restart httpd
+      service: name=httpd state=restarted
+
+    - name: firewalld reload
+      command: firewall-cmd --reload#!/bin/bash

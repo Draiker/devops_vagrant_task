@@ -1,0 +1,113 @@
+---
+- name: Install DataBase server
+  hosts: srvDB
+  become: true
+
+  tasks:
+    - name: Install EPEL package
+      yum: pkg={{ item.name }} state=present
+      with_items:
+        - name: epel-release
+        - name: yum-utils
+      tags: epel
+
+    # Install PostgresSQL
+
+    - name: Add Postgres repo
+      yum:
+        name: https://download.postgresql.org/pub/repos/yum/11/redhat/rhel-7-x86_64/pgdg-centos11-11-2.noarch.rpm
+        state: present
+    
+    - name: Install Postgress
+      yum: pkg={{ item.name }} state=present
+      with_items:
+        - name: postgresql11
+        - name: postgresql11-server
+      tags: pgsql
+    
+    - name: Init Postgres config
+      command: /usr/pgsql-11/bin/postgresql-11-setup initdb
+    
+    - name: Start Postgres service
+      service:
+        name: postgresql-11       
+        state: started
+        enabled: yes
+
+
+    # Secure config
+    - name: Change listen interface
+      replace:
+        path: /var/lib/pgsql/11/data/postgresql.conf
+        regexp: "#listen_addresses = 'localhost'"
+        replace: "listen_addresses = '*'"
+      notify:
+        - restart postgres
+
+    - name: Change listen interface
+      replace:
+        path: /var/lib/pgsql/11/data/postgresql.conf
+        regexp: "#port = 5432"
+        replace: "port = 5432"
+      notify:
+        - restart postgres
+
+    - name: insert line in file
+      lineinfile:
+        path: /var/lib/pgsql/11/data/pg_hba.conf
+        insertafter: EOF
+        line: "{{ item }}"
+      loop:
+        - host    {{ DBNAME }}    {{ DBUSER }}    {{ NETWORK }}0/24    password
+        - host    all    all    0.0.0.0/0    reject
+      notify:
+        - restart postgres
+
+    - name: Create user
+      become_user: postgres
+      command: psql -c "CREATE USER {{ DBUSER }} WITH ENCRYPTED PASSWORD '{{ DBPASSWD }}';"
+      notify:
+        - restart postgres
+
+    - name: create db
+      become_user: postgres
+      command: psql -c "CREATE DATABASE {{ DBNAME }} WITH OWNER {{ DBUSER }};"
+      notify:
+        - restart postgres
+
+    - name: Add privillages
+      become_user: postgres
+      command: psql -c "GRANT ALL PRIVILEGES ON DATABASE {{ DBNAME }} to {{ DBUSER }};"
+      notify:
+        - restart postgres
+
+    - name: Start service firewalld, if not started
+      service:
+        name: firewalld       
+        state: started
+        enabled: yes    
+
+    - name: Add ssh service firewalld
+      firewalld:
+        zone: public
+        service: ssh
+        permanent: yes
+        state: enabled
+      notify:
+        - firewalld reload
+
+    - name: Add postgres service firewalld
+      firewalld:
+        zone: public
+        port: 5432/tcp
+        permanent: yes
+        state: enabled
+      notify:
+        - firewalld reload
+       
+  handlers:
+    - name: restart postgres
+      service: name=postgresql-11 state=restarted
+
+    - name: firewalld reload
+      command: firewall-cmd --reload

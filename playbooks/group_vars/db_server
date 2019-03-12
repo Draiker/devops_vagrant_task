@@ -1,0 +1,4 @@
+mariadb_root_password: 'roottoor'
+mariadb_service: mariadb
+mariadb_bind_address: '0.0.0.0'
+mariadb_port: 3306

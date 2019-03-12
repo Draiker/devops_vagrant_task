@@ -1,0 +1,52 @@
+---
+- name: Balancer install
+  hosts: srvLB
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Install epel release
+      yum:
+        name: epel-release
+        state: present
+
+    - name: Install haproxy
+      yum:
+        name: haproxy
+        state: present
+
+    - name: Pushes configuration
+      template: src=haproxy.cfg.j2 dest=/etc/haproxy/haproxy.cfg mode=0640 owner=root group=root
+      notify:
+        - restart haproxy
+
+    - name: Start service firewalld, if not started
+      service:
+        name: firewalld       
+        state: started
+        enabled: yes    
+
+    - name: Add ssh service firewalld
+      firewalld:
+          zone: public
+          service: ssh
+          permanent: yes
+          state: enabled
+      notify:
+        - firewalld reload
+
+    - name: Add http service firewalld
+      firewalld:
+        zone: public
+        port: 80/tcp
+        permanent: yes
+        state: enabled
+      notify:
+        - firewalld reload
+       
+  handlers:
+    - name: restart haproxy
+      service: name=haproxy state=restarted
+
+    - name: firewalld reload
+      command: firewall-cmd --reload
